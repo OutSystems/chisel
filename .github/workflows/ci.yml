@@ -11,26 +11,24 @@ jobs:
     name: Build & Test
     strategy:
       matrix:
-        # optionally test/build across multiple platforms/Go-versions
-        go-version: ["stable"] # '1.16', '1.17', '1.18,
+        go-version: [1.18.x, 1.19.x]
         platform: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Go
+      - name: Install Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
-          check-latest: true
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Build
         run: go build -v -o /dev/null .
       - name: Test
         run: go test -v ./...
   # ================
-  # RELEASE BINARIES (on push "v*" tag)
+  # RELEASE JOBS
+  #   runs after a success test
+  #   only runs on push "v*" tag
   # ================
   release_binaries:
     name: Release Binaries
@@ -48,9 +46,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: release --config .github/goreleaser.yml
-  # ================
-  # RELEASE DOCKER IMAGES (on push "v*" tag)
-  # ================
   release_docker:
     name: Release Docker Images
     needs: test
@@ -69,7 +64,7 @@ jobs:
           username: jpillora
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Docker meta
-        id: meta
+        id: docker_meta
         uses: docker/metadata-action@v4
         with:
           images: jpillora/chisel
