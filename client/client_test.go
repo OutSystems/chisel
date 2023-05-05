@@ -47,7 +47,7 @@ func TestCustomHeaders(t *testing.T) {
 
 // with the update Go to 1.20, these Unit Tests start failing,
 // since this test is related to client side, and the "fingerprint" flag is not available in cloud-connector
-// we can remove these 3 Unit Tests
+// we can remove/comment these 3 Unit Tests, until fixed in upstream
 
 // func TestFallbackLegacyFingerprint(t *testing.T) {
 // 	config := Config{
