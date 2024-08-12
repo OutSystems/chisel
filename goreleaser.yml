@@ -1,6 +1,7 @@
 # test this goreleaser config with:
 # - cd chisel
 # - goreleaser --clean --snapshot --config goreleaser.yml
+version: 2
 project_name: chisel
 before:
   hooks:
