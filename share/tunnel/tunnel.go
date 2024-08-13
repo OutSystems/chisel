@@ -188,7 +188,7 @@ func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 
 		errChannel := make(chan error, 2)
 
-		time.AfterFunc(reply_timeout, func() {
+		timeoutTimer := time.AfterFunc(reply_timeout, func() {
 			errChannel <- errors.New("KEEPALIVE REPLY TIMEOUT ERROR")
 		})
 
@@ -206,6 +206,12 @@ func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 		}()
 
 		err := <-errChannel
+
+		// explicitly stop the timer, as it's no longer needed at this point.
+		timeoutTimer.Stop()
+		// errChannel should be garbage collected, as it won't be in use, even on a timeout,
+		// 	as SendRequest will be unblocked on connection closure, the goroutine will send
+		// 	 an error message and finish, therefore releasing the channel.
 
 		if err != nil {
 			break
