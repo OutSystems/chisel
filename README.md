@@ -209,7 +209,6 @@ $ chisel server --help
 ```
 <!--/tmpl-->
 
-
 <!--tmpl,code=plain:echo "$ chisel client --help" && go run main.go client --help | sed 's#0.0.0-src (go1\..*)#X.Y.Z#' -->
 ``` plain 
 $ chisel client --help
@@ -390,7 +389,6 @@ Internally, this is done using the _Password_ authentication method provided by 
     ```
 
 1. Now you have an encrypted, authenticated SOCKS5 connection over HTTP
-
 
 #### Caveats
 
