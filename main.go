@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -89,7 +88,7 @@ var commonHelp = `
 
 func generatePidFile() {
 	pid := []byte(strconv.Itoa(os.Getpid()))
-	if err := ioutil.WriteFile("chisel.pid", pid, 0644); err != nil {
+	if err := os.WriteFile("chisel.pid", pid, 0644); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -240,6 +239,9 @@ func server(args []string) {
 		config.KeyFile = settings.Env("KEY_FILE")
 	} else if config.KeySeed == "" {
 		config.KeySeed = settings.Env("KEY")
+	}
+	if config.Auth == "" {
+		config.Auth = os.Getenv("AUTH")
 	}
 	s, err := chserver.NewServer(config)
 	if err != nil {
