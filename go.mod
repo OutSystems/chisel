@@ -3,7 +3,6 @@ module github.com/jpillora/chisel
 go 1.23.0
 
 toolchain go1.23.7
-
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/fsnotify/fsnotify v1.8.0
