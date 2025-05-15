@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chisel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chisel
+  template:
+    metadata:
+      labels:
+        app: chisel
+    spec:
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: chisel
+          image: registry:5000/outsystems/chisel:1.10.1-next
+          args: ["server", "--port=8099", "--reverse", "-v", "--keepalive", "10s"]
+          ports:
+            - containerPort: 8099
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
+
+          # lifecycle:
+          #   preStop:
+          #     exec:
+          #       command: ["-c", "echo PreStop hook invoked; sleep 5"]
