@@ -15,7 +15,7 @@ spec:
       terminationGracePeriodSeconds: 120
       containers:
         - name: chisel
-          image: registry:5000/outsystems/chisel:1.10.1-next
+          image: k3d-registry.localhost:5000/outsystems/chisel:1.10.4-next
           args: ["server", "--port=8099", "--reverse", "-v", "--keepalive", "10s"]
           ports:
             - containerPort: 8099

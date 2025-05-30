@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chisel-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chisel-client
+  template:
+    metadata:
+      labels:
+        app: chisel-client
+    spec:
+      terminationGracePeriodSeconds: 120  # graceful shutdown time
+      containers:
+        - name: chisel-client
+          image: k3d-registry.localhost:5000/outsystems/chisel:1.10.4-next
+          args: ["client", "-v", "http://10.42.148.2:8099", "R:8888:127.0.0.1:8081"]
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]  # allow time to shutdown gracefully
+          ports:
+            - containerPort: 8888
