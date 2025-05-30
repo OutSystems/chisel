@@ -175,6 +175,7 @@ var serverHelp = `
     instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
+// added gracefull shutdown logic for server.
 func server(args []string) {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 	config := &chserver.Config{}
@@ -412,6 +413,7 @@ var clientHelp = `
     enabled (mutual-TLS).
 ` + commonHelp
 
+// added gracefull shutdown logic for client.
 func client(args []string) {
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 	config := chclient.Config{Headers: http.Header{}}
