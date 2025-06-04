@@ -1,18 +1,18 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
+	"context"
+	"os/signal"
+	"syscall"
 
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
@@ -22,7 +22,7 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 )
 
-var help = ` 
+var help = `
   Usage: chisel [command] [--help]
 
   Version: ` + chshare.BuildVersion + ` (` + runtime.Version() + `)
@@ -33,9 +33,11 @@ var help = `
 
   Read more:
     https://github.com/jpillora/chisel
+
 `
 
 func main() {
+
 	version := flag.Bool("version", false, "")
 	v := flag.Bool("v", false, "")
 	flag.Bool("help", false, "")
@@ -49,6 +51,7 @@ func main() {
 	}
 
 	args := flag.Args()
+
 	subcmd := ""
 	if len(args) > 0 {
 		subcmd = args[0]
@@ -85,6 +88,7 @@ var commonHelp = `
     https://github.com/jpillora/chisel
 
 `
+
 func generatePidFile() {
 	pid := []byte(strconv.Itoa(os.Getpid()))
 	if err := os.WriteFile("chisel.pid", pid, 0644); err != nil {
@@ -175,11 +179,11 @@ var serverHelp = `
     instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
-// added gracefull shutdown logic for server.
 func server(args []string) {
-	flags := flag.NewFlagSet("server", flag.ContinueOnError)
-	config := &chserver.Config{}
 
+	flags := flag.NewFlagSet("server", flag.ContinueOnError)
+
+	config := &chserver.Config{}
 	flags.StringVar(&config.KeySeed, "key", "", "")
 	flags.StringVar(&config.KeyFile, "keyfile", "", "")
 	flags.StringVar(&config.AuthFile, "authfile", "", "")
@@ -208,7 +212,6 @@ func server(args []string) {
 	if err := flags.Parse(args); err != nil {
 		log.Fatal(err)
 	}
-
 	// Override Proxy with backend flag if provided
 	if *backend != "" {
 		config.Proxy = *backend
@@ -249,7 +252,6 @@ func server(args []string) {
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
 	}
-
 	s, err := chserver.NewServer(config)
 	if err != nil {
 		log.Fatal(err)
@@ -259,20 +261,16 @@ func server(args []string) {
 		generatePidFile()
 	}
 	go cos.GoStats()
-
 	// Create a cancelable context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
-
 	// Handle interrupt signals to cancel the context gracefully
 	go handleInterrupt(cancel)
-
 	// Start the server in a goroutine
 	go func() {
 		if err := s.Start(*host, *port); err != nil {
 			log.Fatal(err)
 		}
 	}()
-
 	// Wait for cancellation signal
 	<-ctx.Done()
 	log.Println("Server shutting down")
@@ -291,6 +289,45 @@ func server(args []string) {
 	case <-time.After(10 * time.Second):
 		log.Println("Timeout waiting for server to close")
 	}
+}
+
+type multiFlag struct {
+	values *[]string
+}
+
+func (flag multiFlag) String() string {
+	return strings.Join(*flag.values, ", ")
+}
+
+func (flag multiFlag) Set(arg string) error {
+	*flag.values = append(*flag.values, arg)
+	return nil
+}
+
+type headerFlags struct {
+	http.Header
+}
+
+func (flag *headerFlags) String() string {
+	var out strings.Builder
+	for k, v := range flag.Header {
+		out.WriteString(fmt.Sprintf("%s: %s\n", k, v))
+	}
+	return out.String()
+}
+
+func (flag *headerFlags) Set(arg string) error {
+	index := strings.Index(arg, ":")
+	if index < 0 {
+		return fmt.Errorf(`Invalid header (%s). Should be in the format "HeaderName: HeaderContent"`, arg)
+	}
+	if flag.Header == nil {
+		flag.Header = http.Header{}
+	}
+	key := arg[0:index]
+	value := strings.TrimSpace(arg[index+1:])
+	flag.Header.Add(key, value)
+	return nil
 }
 
 var clientHelp = `
@@ -413,11 +450,9 @@ var clientHelp = `
     enabled (mutual-TLS).
 ` + commonHelp
 
-// added gracefull shutdown logic for client.
 func client(args []string) {
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 	config := chclient.Config{Headers: http.Header{}}
-
 	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
 	flags.StringVar(&config.Auth, "auth", "", "")
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
@@ -429,12 +464,10 @@ func client(args []string) {
 	flags.StringVar(&config.TLS.Cert, "tls-cert", "", "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
 	flags.Var(&headerFlags{config.Headers}, "header", "")
-
 	hostname := flags.String("hostname", "", "")
 	sni := flags.String("sni", "", "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
-
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(0)
@@ -442,32 +475,28 @@ func client(args []string) {
 	if err := flags.Parse(args); err != nil {
 		log.Fatal(err)
 	}
-
+	//pull out options, put back remaining args
 	args = flags.Args()
 	if len(args) < 2 {
-		log.Fatalf("A server and at least one remote is required")
+		log.Fatalf("A server and least one remote is required")
 	}
 	config.Server = args[0]
 	config.Remotes = args[1:]
-
+	//default auth
 	if config.Auth == "" {
 		config.Auth = os.Getenv("AUTH")
 	}
+	//move hostname onto headers
 	if *hostname != "" {
 		config.Headers.Set("Host", *hostname)
 		config.TLS.ServerName = *hostname
 	}
+
 	if *sni != "" {
 		config.TLS.ServerName = *sni
 	}
 
-	// Create a cancelable context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Handle interrupt signals to cancel the context gracefully
-	go handleInterrupt(cancel)
-
-	// Create and start the client
+	//ready
 	c, err := chclient.NewClient(&config)
 	if err != nil {
 		log.Fatal(err)
@@ -477,7 +506,10 @@ func client(args []string) {
 		generatePidFile()
 	}
 	go cos.GoStats()
-
+	// Create a cancelable context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	// Handle interrupt signals to cancel the context gracefully
+	go handleInterrupt(cancel)
 	// Start the client in a goroutine so we can control shutdown
 	go func() {
 		if err := c.Start(ctx); err != nil {
@@ -512,43 +544,4 @@ func handleInterrupt(cancel context.CancelFunc) {
 	fmt.Println("Received termination signal, initiating graceful shutdown...")
 	cancel()
 	fmt.Println("Shutting down gracefully...")
-}
-
-type multiFlag struct {
-	values *[]string
-}
-
-func (flag multiFlag) String() string {
-	return strings.Join(*flag.values, ", ")
-}
-
-func (flag multiFlag) Set(arg string) error {
-	*flag.values = append(*flag.values, arg)
-	return nil
-}
-
-type headerFlags struct {
-	http.Header
-}
-
-func (flag *headerFlags) String() string {
-	var out strings.Builder
-	for k, v := range flag.Header {
-		out.WriteString(fmt.Sprintf("%s: %s\n", k, v))
-	}
-	return out.String()
-}
-
-func (flag *headerFlags) Set(arg string) error {
-	index := strings.Index(arg, ":")
-	if index < 0 {
-		return fmt.Errorf(`Invalid header (%s). Should be in the format "HeaderName: HeaderContent"`, arg)
-	}
-	if flag.Header == nil {
-		flag.Header = http.Header{}
-	}
-	key := arg[0:index]
-	value := strings.TrimSpace(arg[index+1:])
-	flag.Header.Add(key, value)
-	return nil
 }
