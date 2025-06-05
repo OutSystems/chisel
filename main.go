@@ -190,7 +190,7 @@ func server(args []string) {
 	flags.StringVar(&config.Auth, "auth", "", "")
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")
 	flags.StringVar(&config.Proxy, "proxy", "", "")
-	backend := flags.String("backend", "", "") // separate backend variable
+	flags.StringVar(&config.Proxy, "backend", "", "")
 	flags.BoolVar(&config.Socks5, "socks5", false, "")
 	flags.BoolVar(&config.Reverse, "reverse", false, "")
 	flags.StringVar(&config.TLS.Key, "tls-key", "", "")
@@ -209,13 +209,7 @@ func server(args []string) {
 		fmt.Print(serverHelp)
 		os.Exit(0)
 	}
-	if err := flags.Parse(args); err != nil {
-		log.Fatal(err)
-	}
-	// Override Proxy with backend flag if provided
-	if *backend != "" {
-		config.Proxy = *backend
-	}
+	flags.Parse(args)
 
 	if *keyGen != "" {
 		if err := ccrypto.GenerateKeyFile(*keyGen, config.KeySeed); err != nil {
@@ -309,11 +303,11 @@ type headerFlags struct {
 }
 
 func (flag *headerFlags) String() string {
-	var out strings.Builder
+	out := ""
 	for k, v := range flag.Header {
-		out.WriteString(fmt.Sprintf("%s: %s\n", k, v))
+		out += fmt.Sprintf("%s: %s\n", k, v)
 	}
-	return out.String()
+	return out
 }
 
 func (flag *headerFlags) Set(arg string) error {
@@ -325,8 +319,8 @@ func (flag *headerFlags) Set(arg string) error {
 		flag.Header = http.Header{}
 	}
 	key := arg[0:index]
-	value := strings.TrimSpace(arg[index+1:])
-	flag.Header.Add(key, value)
+	value := arg[index+1:]
+	flag.Header.Set(key, strings.TrimSpace(value))
 	return nil
 }
 
@@ -472,9 +466,7 @@ func client(args []string) {
 		fmt.Print(clientHelp)
 		os.Exit(0)
 	}
-	if err := flags.Parse(args); err != nil {
-		log.Fatal(err)
-	}
+	flags.Parse(args)
 	//pull out options, put back remaining args
 	args = flags.Args()
 	if len(args) < 2 {
