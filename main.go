@@ -10,9 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"context"
-	"os/signal"
-	"syscall"
 
 	chclient "github.com/jpillora/chisel/client"
 	chserver "github.com/jpillora/chisel/server"
@@ -255,10 +252,7 @@ func server(args []string) {
 		generatePidFile()
 	}
 	go cos.GoStats()
-	// Create a cancelable context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	// Handle interrupt signals to cancel the context gracefully
-	go handleInterrupt(cancel)
+	ctx := cos.InterruptContext()
 	// Start the server in a goroutine
 	go func() {
 		if err := s.Start(*host, *port); err != nil {
@@ -279,7 +273,7 @@ func server(args []string) {
 
 	select {
 	case <-done:
-		log.Println("Server closed gracefully")
+		log.Println("Server shutdown gracefully")
 	case <-time.After(10 * time.Second):
 		log.Println("Timeout waiting for server to close")
 	}
@@ -498,10 +492,7 @@ func client(args []string) {
 		generatePidFile()
 	}
 	go cos.GoStats()
-	// Create a cancelable context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	// Handle interrupt signals to cancel the context gracefully
-	go handleInterrupt(cancel)
+	ctx := cos.InterruptContext()
 	// Start the client in a goroutine so we can control shutdown
 	go func() {
 		if err := c.Start(ctx); err != nil {
@@ -523,17 +514,8 @@ func client(args []string) {
 
 	select {
 	case <-done:
-		log.Println("Client closed gracefully")
+		log.Println("Client shutdown gracefully")
 	case <-time.After(10 * time.Second):
 		log.Println("Timeout waiting for client to close")
 	}
-}
-
-func handleInterrupt(cancel context.CancelFunc) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-	fmt.Println("Received termination signal, initiating graceful shutdown...")
-	cancel()
-	fmt.Println("Shutting down gracefully...")
 }
