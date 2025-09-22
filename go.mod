@@ -9,17 +9,17 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/jpillora/requestlog v1.0.0
 	github.com/jpillora/sizestr v1.0.0
-	golang.org/x/crypto v0.41.0
-	golang.org/x/net v0.43.0
-	golang.org/x/sync v0.16.0
+	golang.org/x/crypto v0.42.0
+	golang.org/x/net v0.44.0
+	golang.org/x/sync v0.17.0
 )
 
 require (
 	github.com/andrew-d/go-termutil v0.0.0-20150726205930-009166a695a2 // indirect
 	github.com/jpillora/ansi v1.0.3 // indirect
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 )
 
 replace github.com/jpillora/chisel => ../chisel
