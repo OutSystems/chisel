@@ -10,7 +10,6 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-      - GOTOOLCHAIN=local
     ldflags:
       - -s -w -X github.com/outsystems/chisel/share.BuildVersion={{.Version}}
     flags:
