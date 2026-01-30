@@ -1,7 +1,3 @@
-FROM alpine
-RUN apk add --no-cache ca-certificates openssl \
- && apk upgrade --no-cache
-WORKDIR /app
+FROM gcr.io/distroless/static:nonroot
 COPY chisel /app/
-USER 65532:65532
 ENTRYPOINT ["/app/chisel"]
