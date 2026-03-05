@@ -1,4 +1,3 @@
-FROM alpine
-RUN apk update && apk upgrade
+FROM gcr.io/distroless/static:nonroot
 COPY chisel /app/
 ENTRYPOINT ["/app/chisel"]
