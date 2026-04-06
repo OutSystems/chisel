@@ -25,6 +25,9 @@ type Config struct {
 	Outbound  bool
 	Socks     bool
 	KeepAlive time.Duration
+	//ACL optionally checks if a given address (host:port) is allowed.
+	//When set, outbound connections are denied if this returns false.
+	ACL func(addr string) bool
 }
 
 // Tunnel represents an SSH tunnel with proxy capabilities.
@@ -174,17 +177,14 @@ func (t *Tunnel) BindRemotes(ctx context.Context, remotes []*settings.Remote) er
 
 func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 	//ping forever
-
-	//reply_timeout set to KeepAlive interval, if KeepAlive is less than 10s, set reply_timeout to 10s
-	//maybe a new config option for reply_timeout is also fine
-	reply_timeout := t.Config.KeepAlive
-
-	if reply_timeout < 10*time.Second {
-		reply_timeout = 10 * time.Second
+	keepAliveInterval := t.Config.KeepAlive
+	if keepAliveInterval < 5*time.Second {
+		keepAliveInterval = 5 * time.Second
 	}
 
+	reply_timeout := 2 * time.Second
 	for {
-		time.Sleep(t.Config.KeepAlive)
+		time.Sleep(keepAliveInterval)
 
 		errChannel := make(chan error, 2)
 
