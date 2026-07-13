@@ -1,0 +1,11 @@
+# Trivy ignore file — Cloud Connector / Chisel publish pipeline
+#
+# CVE-2026-48113 — chisel "ACL Bypass via Post-Handshake SSH Channel ExtraData Injection".
+# FALSE POSITIVE for our build: the fix is already present in chisel (PR #51,
+# "Enforce auth ACL on tunnel channels", contained in tags v1.11.5-os.1/2/3).
+# Trivy flags it only because the OutSystems fork tag `1.11.5-os.N` is a SemVer
+# *pre-release* of `1.11.5`, so it sorts *below* the fixed `1.11.5`.
+# Re-evaluate (and remove this entry) when chisel rebases onto an upstream
+# version > 1.11.5, at which point the tag sorts above the fix.
+# Ref: RDODCP-917
+CVE-2026-48113
