@@ -13,6 +13,7 @@ import (
 	"github.com/armon/go-socks5"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/metrics"
 	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
@@ -27,7 +28,8 @@ type Config struct {
 	KeepAlive time.Duration
 	//ACL optionally checks if a given address (host:port) is allowed.
 	//When set, outbound connections are denied if this returns false.
-	ACL func(addr string) bool
+	ACL     func(addr string) bool
+	Metrics *metrics.Metrics // nil = disabled
 }
 
 // Tunnel represents an SSH tunnel with proxy capabilities.
@@ -48,13 +50,15 @@ type Tunnel struct {
 	//internals
 	connStats   cnet.ConnCount
 	socksServer *socks5.Server
+	metrics     *metrics.Metrics
 }
 
 // New Tunnel from the given Config
 func New(c Config) *Tunnel {
 	c.Logger = c.Logger.Fork("tun")
 	t := &Tunnel{
-		Config: c,
+		Config:  c,
+		metrics: c.Metrics,
 	}
 	t.activatingConn.Add(1)
 	//setup socks server (not listening on any port!)
@@ -212,6 +216,15 @@ func (t *Tunnel) keepAliveLoop(sshConn ssh.Conn) {
 		// errChannel should be garbage collected, as it won't be in use, even on a timeout,
 		// 	as SendRequest will be unblocked on connection closure, the goroutine will send
 		// 	 an error message and finish, therefore releasing the channel.
+
+		// Record keepalive ping outcome
+		if err == nil {
+			t.recordTunnelKeepalivePing("success")
+		} else if err.Error() == "KEEPALIVE REPLY TIMEOUT ERROR" {
+			t.recordTunnelKeepalivePing("timeout")
+		} else {
+			t.recordTunnelKeepalivePing("error")
+		}
 
 		if err != nil {
 			break

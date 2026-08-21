@@ -57,6 +57,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	sshChan, reqs, err := ch.Accept()
 	if err != nil {
 		t.Debugf("Failed to accept stream: %s", err)
+		t.recordTunnelConnectionError()
 		return
 	}
 	stream := io.ReadWriteCloser(sshChan)
@@ -66,6 +67,8 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 	l := t.Logger.Fork("conn#%d", t.connStats.New())
 	//ready to handle
 	t.connStats.Open()
+	t.recordTunnelConnection()
+	t.recordTunnelActiveConnectionsInc()
 	l.Debugf("Open %s", t.connStats.String())
 	if socks {
 		err = t.handleSocks(stream)
@@ -75,6 +78,7 @@ func (t *Tunnel) handleSSHChannel(ch ssh.NewChannel) {
 		err = t.handleTCP(l, stream, hostPort)
 	}
 	t.connStats.Close()
+	t.recordTunnelActiveConnectionsDec()
 	errmsg := ""
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
 		errmsg = fmt.Sprintf(" (error %s)", err)
@@ -89,9 +93,11 @@ func (t *Tunnel) handleSocks(src io.ReadWriteCloser) error {
 func (t *Tunnel) handleTCP(l *cio.Logger, src io.ReadWriteCloser, hostPort string) error {
 	dst, err := net.Dial("tcp", hostPort)
 	if err != nil {
+		t.recordTunnelConnectionError()
 		return err
 	}
 	s, r := cio.Pipe(src, dst)
+	t.recordTunnelBytes(s, r)
 	l.Debugf("sent %s received %s", sizestr.ToString(s), sizestr.ToString(r))
 	return nil
 }
