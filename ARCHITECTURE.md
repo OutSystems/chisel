@@ -52,6 +52,7 @@ chisel/
 │   ├── cnet/            # WebSocket-to-net.Conn adapter, HTTP server with graceful shutdown
 │   ├── cos/             # OS signals (SIGUSR2 stats, SIGHUP reconnect), context helpers
 │   ├── settings/        # Config encoding, remote parsing, user/auth management, env helpers
+│   ├── metrics/         # Optional Prometheus metrics (counters, gauges, histograms) + /metrics HTTP server
 │   └── tunnel/          # Core tunnel engine — proxy, SSH channel handling, keepalive, UDP
 ├── test/
 │   ├── e2e/             # End-to-end tests (auth, TLS, SOCKS, UDP, proxy)
@@ -98,6 +99,16 @@ The core data-plane, shared by both client and server:
 - **`Config`** -- JSON-serialized handshake payload exchanged between client and server over SSH.
 - **`UserIndex`** -- Loads and watches the auth file, manages user permissions with regex-based address ACLs.
 - **`Env`** -- Reads `CHISEL_*` environment variables for tuning (timeouts, buffer sizes, UDP settings).
+
+### `share/metrics/` -- Observability
+
+Optional Prometheus instrumentation, shared by both `client.Client` and `server.Server`:
+
+- **`Metrics`** -- Holds a private `prometheus.Registry` and the counters/gauges/histograms for connection attempts/errors, auth outcomes, session setup duration, tunnel bytes sent/received, active connections, and keepalive ping results.
+- **`New(namespace string) (*Metrics, error)`** -- Builds and registers all metrics under the given namespace (defaults to `"chisel"` when empty). Validates the namespace against `^[a-zA-Z_][a-zA-Z0-9_]*$` and returns an error for an invalid one -- callers do not need to re-validate.
+- **`Start(addr string) error`** -- Serves the registry at `/metrics` over plain HTTP on a background goroutine.
+
+Metrics are opt-in: `client.Config`/`server.Config` carry `MetricsAddr`/`MetricsNamespace` fields, and `NewClient`/`NewServer` only construct a `*Metrics` when `MetricsAddr != ""`, passing it through to `tunnel.Config.Metrics` so `share/tunnel` can record per-connection byte counts and keepalive outcomes.
 
 ### `share/ccrypto/` -- Cryptography
 
@@ -176,6 +187,7 @@ This layering means chisel traffic looks like regular HTTP/WebSocket traffic to 
 | `fsnotify/fsnotify` | Hot-reload of the users auth file |
 | `golang.org/x/net/proxy` | SOCKS5 outbound proxy dialer (client side) |
 | `golang.org/x/sync/errgroup` | Concurrent goroutine lifecycle management |
+| `prometheus/client_golang` | Optional Prometheus metrics registry, collectors, and `/metrics` HTTP handler |
 
 ## Key Design Decisions
 

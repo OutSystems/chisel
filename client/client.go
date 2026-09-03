@@ -21,6 +21,7 @@ import (
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/metrics"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
 
@@ -43,6 +44,8 @@ type Config struct {
 	TLS              TLSConfig
 	DialContext      func(ctx context.Context, network, addr string) (net.Conn, error)
 	Verbose          bool
+	MetricsAddr      string
+	MetricsNamespace string
 }
 
 // TLSConfig for a Client
@@ -67,6 +70,7 @@ type Client struct {
 	stop      func()
 	eg        *errgroup.Group
 	tunnel    *tunnel.Tunnel
+	metrics   *metrics.Metrics
 }
 
 // NewClient creates a new client instance
@@ -179,6 +183,18 @@ func NewClient(c *Config) (*Client, error) {
 		HostKeyCallback: client.verifyServer,
 		Timeout:         settings.EnvDuration("SSH_TIMEOUT", 30*time.Second),
 	}
+	//initialize metrics if enabled
+	if c.MetricsAddr != "" {
+		m, err := metrics.New(c.MetricsNamespace)
+		if err != nil {
+			return nil, err
+		}
+		client.metrics = m
+		if err := client.metrics.Start(c.MetricsAddr); err != nil {
+			return nil, err
+		}
+		client.Infof("Metrics server started on %s", c.MetricsAddr)
+	}
 	//prepare client tunnel
 	client.tunnel = tunnel.New(tunnel.Config{
 		Logger:    client.Logger,
@@ -186,6 +202,7 @@ func NewClient(c *Config) (*Client, error) {
 		Outbound:  hasReverse,
 		Socks:     hasReverse && hasSocks,
 		KeepAlive: client.config.KeepAlive,
+		Metrics:   client.metrics,
 	})
 	return client, nil
 }

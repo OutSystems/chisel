@@ -28,6 +28,15 @@ var help = `
     server - runs chisel in server mode
     client - runs chisel in client mode
 
+  Global Options (must precede the command):
+
+    --metrics, An optional "host:port" to serve Prometheus metrics on
+    at /metrics. When unset, no metrics are collected or served.
+
+    --metrics-namespace, An optional prefix applied to every metric name
+    (defaults to "chisel"). Must match [a-zA-Z_][a-zA-Z0-9_]*. Only used
+    when --metrics is set.
+
   Read more:
     https://github.com/jpillora/chisel
 
@@ -37,6 +46,8 @@ func main() {
 
 	version := flag.Bool("version", false, "")
 	v := flag.Bool("v", false, "")
+	metricsAddr := flag.String("metrics", "", "")
+	metricsNamespace := flag.String("metrics-namespace", "", "")
 	flag.Bool("help", false, "")
 	flag.Bool("h", false, "")
 	flag.Usage = func() {}
@@ -57,9 +68,9 @@ func main() {
 
 	switch subcmd {
 	case "server":
-		server(args)
+		server(args, *metricsAddr, *metricsNamespace)
 	case "client":
-		client(args)
+		client(args, *metricsAddr, *metricsNamespace)
 	default:
 		fmt.Print(help)
 		os.Exit(0)
@@ -176,11 +187,13 @@ var serverHelp = `
     instead of the system roots. This is commonly used to implement mutual-TLS. 
 ` + commonHelp
 
-func server(args []string) {
+func server(args []string, metricsAddr, metricsNamespace string) {
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 
 	config := &chserver.Config{}
+	config.MetricsAddr = metricsAddr
+	config.MetricsNamespace = metricsNamespace
 	flags.StringVar(&config.KeySeed, "key", "", "")
 	flags.StringVar(&config.KeyFile, "keyfile", "", "")
 	flags.StringVar(&config.AuthFile, "authfile", "", "")
@@ -421,9 +434,11 @@ var clientHelp = `
     enabled (mutual-TLS).
 ` + commonHelp
 
-func client(args []string) {
+func client(args []string, metricsAddr, metricsNamespace string) {
 	flags := flag.NewFlagSet("client", flag.ContinueOnError)
 	config := chclient.Config{Headers: http.Header{}}
+	config.MetricsAddr = metricsAddr
+	config.MetricsNamespace = metricsNamespace
 	flags.StringVar(&config.Fingerprint, "fingerprint", "", "")
 	flags.StringVar(&config.Auth, "auth", "", "")
 	flags.DurationVar(&config.KeepAlive, "keepalive", 25*time.Second, "")

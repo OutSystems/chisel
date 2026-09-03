@@ -7,6 +7,7 @@ import (
 	"time"
 
 	chshare "github.com/jpillora/chisel/share"
+	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/chisel/share/tunnel"
@@ -50,18 +51,33 @@ func (s *Server) handleClientHandler(w http.ResponseWriter, r *http.Request) {
 // handleWebsocket is responsible for handling the websocket connection
 func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	id := atomic.AddInt32(&s.sessCount, 1)
-	l := s.Fork("session#%d", id)
+	clientAddr := req.RemoteAddr
+	var l *cio.Logger
+	if s.Debug {
+		l = s.Fork("session#%d@%s", id, clientAddr)
+	} else {
+		l = s.Fork("session#%d", id)
+	}
 	wsConn, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		l.Debugf("Failed to upgrade (%s)", err)
 		return
 	}
+	// Start timer for session setup duration
+	sessionStart := time.Now()
+
 	conn := cnet.NewWebSocketConn(wsConn)
 	// perform SSH handshake on net.Conn
 	l.Debugf("Handshaking with %s...", req.RemoteAddr)
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.sshConfig)
 	if err != nil {
 		s.Debugf("Failed to handshake (%s)", err)
+		if s.metrics != nil {
+			s.metrics.ServerSessions.WithLabelValues("auth_failure").Inc()
+			if s.Debug {
+				l.Debugf("[metrics] server_sessions_total{outcome=\"auth_failure\"} incremented (client: %s)", clientAddr)
+			}
+		}
 		return
 	}
 	// pull the users from the session map
@@ -93,11 +109,23 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	if r.Type != "config" {
 		failed(s.Errorf("expecting config request"))
+		if s.metrics != nil {
+			s.metrics.ServerSessions.WithLabelValues("config_error").Inc()
+			if s.Debug {
+				l.Debugf("[metrics] server_sessions_total{outcome=\"config_error\"} incremented (client: %s)", clientAddr)
+			}
+		}
 		return
 	}
 	c, err := settings.DecodeConfig(r.Payload)
 	if err != nil {
 		failed(s.Errorf("invalid config"))
+		if s.metrics != nil {
+			s.metrics.ServerSessions.WithLabelValues("config_error").Inc()
+			if s.Debug {
+				l.Debugf("[metrics] server_sessions_total{outcome=\"config_error\"} incremented (client: %s)", clientAddr)
+			}
+		}
 		return
 	}
 	//print if client and server  versions dont match
@@ -117,6 +145,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 			addr := r.UserAddr()
 			if !user.HasAccess(addr) {
 				failed(s.Errorf("access to '%s' denied", addr))
+				if s.metrics != nil {
+					s.metrics.ServerSessions.WithLabelValues("acl_denied").Inc()
+					if s.Debug {
+						l.Debugf("[metrics] server_sessions_total{outcome=\"acl_denied\"} incremented (client: %s)", clientAddr)
+					}
+				}
 				return
 			}
 		}
@@ -134,6 +168,16 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	//successfuly validated config!
 	r.Reply(true, nil)
+	// Record session setup duration and established session
+	if s.metrics != nil {
+		duration := time.Since(sessionStart).Seconds()
+		s.metrics.ServerSessionSetupDuration.Observe(duration)
+		s.metrics.ServerSessions.WithLabelValues("established").Inc()
+		if s.Debug {
+			l.Debugf("[metrics] server_session_setup_duration_seconds observed: %.6fs (client: %s)", duration, clientAddr)
+			l.Debugf("[metrics] server_sessions_total{outcome=\"established\"} incremented (client: %s)", clientAddr)
+		}
+	}
 	//tunnel per ssh connection
 	tunnelConfig := tunnel.Config{
 		Logger:    l,
@@ -141,6 +185,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 		Outbound:  true, //server always accepts outbound
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
+		Metrics:   s.metrics,
 	}
 	//enforce ACL on every channel, not just the initial config
 	if user != nil {
@@ -165,6 +210,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	err = eg.Wait()
 	if err != nil && !strings.HasSuffix(err.Error(), "EOF") {
 		l.Debugf("Closed connection (%s)", err)
+		if s.metrics != nil {
+			s.metrics.ServerSessions.WithLabelValues("transport_error").Inc()
+			if s.Debug {
+				l.Debugf("[metrics] server_sessions_total{outcome=\"transport_error\"} incremented (client: %s)", clientAddr)
+			}
+		}
 	} else {
 		l.Debugf("Closed connection")
 	}

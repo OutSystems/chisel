@@ -25,6 +25,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for full build, test, and release detai
 | `share/` | Shared libraries used by both client and server |
 | `share/tunnel/` | Core tunnel engine -- proxy, SSH channels, keepalive, UDP mux |
 | `share/settings/` | Config parsing, remote format, user/auth, `CHISEL_*` env vars |
+| `share/metrics/` | Optional Prometheus metrics (counters/gauges/histograms) and `/metrics` HTTP server |
 | `share/ccrypto/` | ECDSA key generation, SSH fingerprinting |
 | `share/cnet/` | WebSocket-to-net.Conn adapter, HTTP server with graceful shutdown |
 | `share/cio/` | Bidirectional pipe, logging, stdio |
@@ -77,6 +78,10 @@ Both client and server use `cos.InterruptContext()` for graceful shutdown on SIG
 ### go.mod replace directive
 
 `go.mod` contains `replace github.com/jpillora/chisel => ../chisel`. This is a local development override -- do not remove it, but be aware it means `go mod tidy` expects a sibling directory.
+
+### Metrics are opt-in and validate at construction time
+
+`client.Config`/`server.Config` carry `MetricsAddr`/`MetricsNamespace`. `NewClient`/`NewServer` only build a `*metrics.Metrics` when `MetricsAddr != ""`. Namespace validation (`^[a-zA-Z_][a-zA-Z0-9_]*$`) happens inside `metrics.New()`, which returns `(*Metrics, error)` -- the error flows back through `NewClient`/`NewServer`'s existing `error` return. Do not duplicate namespace validation in callers (including `main.go` or any downstream CLI); rely on the error from `NewClient`/`NewServer` instead.
 
 ## Domain Glossary
 

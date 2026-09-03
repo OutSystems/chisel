@@ -12,6 +12,7 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 - [Install](#install)
 - [Demo](#demo)
 - [Usage](#usage)
+- [Metrics](#metrics)
 - [Contributing](#contributing)
 - [Changelog](#changelog)
 - [License](#license)
@@ -30,6 +31,7 @@ Chisel is a fast TCP/UDP tunnel, transported over HTTP, secured via SSH. Single 
 - Server optionally allows [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections (See [guide below](#socks5-guide))
 - Clients optionally allow [SOCKS5](https://en.wikipedia.org/wiki/SOCKS) connections from a reversed port forward
 - Client connections over stdio which supports `ssh -o ProxyCommand` providing SSH over HTTP
+- Optional [Prometheus metrics](#metrics) endpoint for connection and tunnel observability
 
 ## Install
 
@@ -97,6 +99,15 @@ $ chisel --help
   Commands:
     server - runs chisel in server mode
     client - runs chisel in client mode
+
+  Global Options (must precede the command):
+
+    --metrics, An optional "host:port" to serve Prometheus metrics on
+    at /metrics. When unset, no metrics are collected or served.
+
+    --metrics-namespace, An optional prefix applied to every metric name
+    (defaults to "chisel"). Must match [a-zA-Z_][a-zA-Z0-9_]*. Only used
+    when --metrics is set.
 
   Read more:
     https://github.com/jpillora/chisel
@@ -402,6 +413,25 @@ Since WebSockets support is required:
   - Heroku has full support
   - Openshift has full support though connections are only accepted on ports 8443 and 8080
   - Google App Engine has **no** support (Track this on [their repo](https://code.google.com/p/googleappengine/issues/detail?id=2535))
+
+## Metrics
+
+Both `chisel server` and `chisel client` can optionally expose a [Prometheus](https://prometheus.io) `/metrics` endpoint, covering connection attempts/errors, tunnel bytes transferred, active connections, auth outcomes, and keepalive ping results.
+
+Metrics are opt-in and off by default. Pass `--metrics` (a global option, so it must precede the `server`/`client` subcommand):
+
+```sh
+chisel --metrics 127.0.0.1:9100 server --port 9312
+chisel --metrics 127.0.0.1:9100 client https://my-server.com:9312 3000
+```
+
+Every exported metric name is prefixed with a namespace, which defaults to `chisel` and can be overridden with `--metrics-namespace` (must match `[a-zA-Z_][a-zA-Z0-9_]*`):
+
+```sh
+chisel --metrics 127.0.0.1:9100 --metrics-namespace myapp server --port 9312
+```
+
+The implementation lives in `share/metrics`; see [ARCHITECTURE.md](./ARCHITECTURE.md) for the full metric list and how it wires into the client/server.
 
 ## Contributing
 

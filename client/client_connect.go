@@ -66,6 +66,13 @@ func (c *Client) connectionLoop(ctx context.Context) error {
 
 // connectionOnce connects to the chisel server and blocks
 func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error) {
+	// Record connection attempt
+	if c.metrics != nil {
+		(*c.metrics.ClientConnectionAttempts).Inc()
+		if c.Debug {
+			c.Debugf("[metrics] client_connection_attempts_total incremented")
+		}
+	}
 	//already closed?
 	select {
 	case <-ctx.Done():
@@ -92,6 +99,12 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 	}
 	wsConn, _, err := d.DialContext(ctx, c.server, c.config.Headers)
 	if err != nil {
+		if c.metrics != nil {
+			c.metrics.ClientConnectionErrors.WithLabelValues("handshake_error").Inc()
+			if c.Debug {
+				c.Debugf("[metrics] client_connection_errors_total{cause=\"handshake_error\"} incremented")
+			}
+		}
 		return false, err
 	}
 	conn := cnet.NewWebSocketConn(wsConn)
@@ -103,8 +116,20 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		if strings.Contains(e, "unable to authenticate") {
 			c.Infof("Authentication failed")
 			c.Debugf(e)
+			if c.metrics != nil {
+				c.metrics.ClientConnectionErrors.WithLabelValues("auth_failure").Inc()
+				if c.Debug {
+					c.Debugf("[metrics] client_connection_errors_total{cause=\"auth_failure\"} incremented")
+				}
+			}
 		} else {
 			c.Infof(e)
+			if c.metrics != nil {
+				c.metrics.ClientConnectionErrors.WithLabelValues("handshake_error").Inc()
+				if c.Debug {
+					c.Debugf("[metrics] client_connection_errors_total{cause=\"handshake_error\"} incremented")
+				}
+			}
 		}
 		return false, err
 	}
@@ -123,12 +148,42 @@ func (c *Client) connectionOnce(ctx context.Context) (connected bool, err error)
 		return false, err
 	}
 	if len(configerr) > 0 {
+		if c.metrics != nil {
+			c.metrics.ClientConnectionErrors.WithLabelValues("handshake_error").Inc()
+			if c.Debug {
+				c.Debugf("[metrics] client_connection_errors_total{cause=\"handshake_error\"} incremented")
+			}
+		}
 		return false, errors.New(string(configerr))
+	}
+	// Record handshake duration and set connected status
+	if c.metrics != nil {
+		duration := time.Since(t0).Seconds()
+		c.metrics.ClientHandshakeDuration.Observe(duration)
+		c.metrics.ClientConnected.Set(1)
+		if c.Debug {
+			c.Debugf("[metrics] client_handshake_duration_seconds observed: %.6fs", duration)
+			c.Debugf("[metrics] client_connected set to 1")
+		}
 	}
 	c.Infof("Connected (Latency %s)", time.Since(t0))
 	//connected, handover ssh connection for tunnel to use, and block
 	err = c.tunnel.BindSSH(ctx, sshConn, reqs, chans)
 	c.Infof("Disconnected")
+	// Set disconnected status
+	if c.metrics != nil {
+		c.metrics.ClientConnected.Set(0)
+		if c.Debug {
+			c.Debugf("[metrics] client_connected set to 0")
+		}
+		// Record transport error if it's not EOF
+		if err != nil && err != io.EOF && !strings.HasSuffix(err.Error(), "EOF") {
+			c.metrics.ClientConnectionErrors.WithLabelValues("transport_error").Inc()
+			if c.Debug {
+				c.Debugf("[metrics] client_connection_errors_total{cause=\"transport_error\"} incremented")
+			}
+		}
+	}
 	connected = time.Since(t0) > 5*time.Second
 	return connected, err
 }

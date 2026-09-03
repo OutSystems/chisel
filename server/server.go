@@ -16,6 +16,7 @@ import (
 	"github.com/jpillora/chisel/share/ccrypto"
 	"github.com/jpillora/chisel/share/cio"
 	"github.com/jpillora/chisel/share/cnet"
+	"github.com/jpillora/chisel/share/metrics"
 	"github.com/jpillora/chisel/share/settings"
 	"github.com/jpillora/requestlog"
 	"golang.org/x/crypto/ssh"
@@ -23,15 +24,17 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
-	KeyFile   string
-	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
-	Reverse   bool
-	KeepAlive time.Duration
-	TLS       TLSConfig
+	KeySeed          string
+	KeyFile          string
+	AuthFile         string
+	Auth             string
+	Proxy            string
+	Socks5           bool
+	Reverse          bool
+	KeepAlive        time.Duration
+	TLS              TLSConfig
+	MetricsAddr      string
+	MetricsNamespace string
 }
 
 // Server respresent a chisel service
@@ -45,6 +48,7 @@ type Server struct {
 	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
 	users        *settings.UserIndex
+	metrics      *metrics.Metrics
 }
 
 var upgrader = websocket.Upgrader{
@@ -140,6 +144,18 @@ func NewServer(c *Config) (*Server, error) {
 	if c.Reverse {
 		server.Infof("Reverse tunnelling enabled")
 	}
+	//initialize metrics if enabled
+	if c.MetricsAddr != "" {
+		m, err := metrics.New(c.MetricsNamespace)
+		if err != nil {
+			return nil, err
+		}
+		server.metrics = m
+		if err := server.metrics.Start(c.MetricsAddr); err != nil {
+			return nil, err
+		}
+		server.Infof("Metrics server started on %s", c.MetricsAddr)
+	}
 	return server, nil
 }
 
@@ -199,6 +215,12 @@ func (s *Server) GetFingerprint() string {
 func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 	// check if user authentication is enabled and if not, allow all
 	if s.users.Len() == 0 {
+		if s.metrics != nil {
+			s.metrics.ServerAuthAttempts.WithLabelValues("success").Inc()
+			if s.Debug {
+				s.Debugf("[metrics] server_auth_attempts_total{outcome=\"success\"} incremented")
+			}
+		}
 		return nil, nil
 	}
 	// check the user exists and has matching password
@@ -206,11 +228,23 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	user, found := s.users.Get(n)
 	if !found || user.Pass != string(password) {
 		s.Debugf("Login failed for user: %s", n)
+		if s.metrics != nil {
+			s.metrics.ServerAuthAttempts.WithLabelValues("failure").Inc()
+			if s.Debug {
+				s.Debugf("[metrics] server_auth_attempts_total{outcome=\"failure\"} incremented")
+			}
+		}
 		return nil, errors.New("Invalid authentication for username: %s")
 	}
 	// insert the user session map
 	// TODO this should probably have a lock on it given the map isn't thread-safe
 	s.sessions.Set(string(c.SessionID()), user)
+	if s.metrics != nil {
+		s.metrics.ServerAuthAttempts.WithLabelValues("success").Inc()
+		if s.Debug {
+			s.Debugf("[metrics] server_auth_attempts_total{outcome=\"success\"} incremented")
+		}
+	}
 	return nil, nil
 }
 
