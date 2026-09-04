@@ -6,20 +6,21 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/jpillora/chisel/share/settings"
 	"golang.org/x/sync/errgroup"
 )
 
-//HTTPServer extends net/http Server and
-//adds graceful shutdowns
+// HTTPServer extends net/http Server and
+// adds graceful shutdowns
 type HTTPServer struct {
 	*http.Server
 	waiterMux sync.Mutex
 	waiter    *errgroup.Group
-	listenErr error
 }
 
-//NewHTTPServer creates a new HTTPServer
+// NewHTTPServer creates a new HTTPServer
 func NewHTTPServer() *HTTPServer {
 	return &HTTPServer{
 		Server: &http.Server{},
@@ -53,10 +54,22 @@ func (h *HTTPServer) GoServe(ctx context.Context, l net.Listener, handler http.H
 	h.waiter.Go(func() error {
 		return h.Serve(l)
 	})
-	go func() {
+	//run the drain inside the group so Wait observes it. ctx here is the
+	//group's derived context, so this also unblocks when Serve returns —
+	//that is what lets a bare Close() (no cancellation) still finish Wait.
+	//Serve never returns nil: it reports ErrServerClosed on Close/Shutdown.
+	h.waiter.Go(func() error {
 		<-ctx.Done()
+		//graceful shutdown: stop accepting, drain in-flight requests
+		//for a grace period, then force-close the remainder. hijacked
+		//connections (websocket tunnels) are closed by their owners.
+		grace := settings.EnvDuration("SHUTDOWN_GRACE", 5*time.Second)
+		c, cancel := context.WithTimeout(context.Background(), grace)
+		defer cancel()
+		h.Server.Shutdown(c)
 		h.Close()
-	}()
+		return nil
+	})
 	return nil
 }
 

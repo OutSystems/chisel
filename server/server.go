@@ -2,8 +2,8 @@ package chserver
 
 import (
 	"context"
-	"errors"
-	"log"
+	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -23,18 +23,18 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed   string
-	KeyFile   string
-	AuthFile  string
-	Auth      string
-	Proxy     string
-	Socks5    bool
-	Reverse   bool
-	KeepAlive time.Duration
-	TLS       TLSConfig
+	KeySeed   string        `opts:"name=key,short=-" help:"(deprecated use --keygen and --keyfile instead) An optional string to seed the generation of a ECDSA public and private key pair. All communications will be secured using this key pair. Share the subsequent fingerprint with clients to enable detection of man-in-the-middle attacks (defaults to the CHISEL_KEY environment variable, otherwise a new key is generate each run)."`
+	KeyFile   string        `opts:"name=keyfile,short=-" help:"An optional path to a PEM-encoded SSH private key. When this flag is set, the --key option is ignored, and the provided private key is used to secure all communications. (defaults to the CHISEL_KEY_FILE environment variable). Since ECDSA keys are short, you may also set keyfile to the inline key string itself, exactly as printed by --keygen (a base64 string with a \"ck-\" prefix); no extra base64 encoding is needed."`
+	AuthFile  string        `opts:"name=authfile,short=-" help:"An optional path to a users.json file. This file should be an object with users defined like:\n  {\n    \"<user:pass>\": [\"<addr-regex>\",\"<addr-regex>\"]\n  }\nwhen <user> connects, their <pass> will be verified and then each of the remote addresses will be compared against the list of address regular expressions for a match. Patterns are NOT anchored by default: \"10.0.0.1:80\" also matches \"210.0.0.1:8080\", and \".\" matches any character. Anchor your patterns, e.g. \"^10\\.0\\.0\\.1:80$\". The empty string \"\" matches every address. Addresses will always come in the form \"<remote-host>:<remote-port>\" for normal remotes, \"R:<local-interface>:<local-port>\" for reverse port forwarding remotes, and \"socks\" for SOCKS5 proxy access. Note that SOCKS5 access previously bypassed this list; existing authfiles which should allow SOCKS5 must add an entry matching \"socks\" (the empty wildcard \"\" matches everything, including \"socks\"). This file will be automatically reloaded on change. Reloads apply to new connections and to new tunnels of connected clients; established tunnels are not interrupted."`
+	Auth      string        `opts:"name=auth,short=-" help:"An optional string representing a single user with full access, in the form of <user:pass>. It is equivalent to creating an authfile with {\"<user:pass>\": [\"\"]}. If unset, it will use the environment variable AUTH."`
+	Proxy     string        `opts:"name=backend,short=-" help:"Specifies another HTTP server to proxy requests to when chisel receives a normal HTTP request. Useful for hiding chisel in plain sight. --proxy is accepted as an alias for this flag."`
+	Socks5    bool          `opts:"name=socks5,short=-" help:"Allow clients to access the internal SOCKS5 proxy. See chisel client --help for more information."`
+	Reverse   bool          `opts:"name=reverse,short=-" help:"Allow clients to specify reverse port forwarding remotes in addition to normal remotes."`
+	KeepAlive time.Duration `opts:"name=keepalive,short=-" help:"An optional keepalive interval. Since the underlying transport is HTTP, in many instances we'll be traversing through proxies, often these proxies will close idle connections. You must specify a time with a unit, for example '5s' or '2m'. Defaults to '25s' (set to 0s to disable)."`
+	TLS       TLSConfig     `opts:"mode=embedded"`
 }
 
-// Server respresent a chisel service
+// Server represent a chisel service
 type Server struct {
 	*cio.Logger
 	config       *Config
@@ -42,7 +42,6 @@ type Server struct {
 	httpServer   *cnet.HTTPServer
 	reverseProxy *httputil.ReverseProxy
 	sessCount    int32
-	sessions     *settings.Users
 	sshConfig    *ssh.ServerConfig
 	users        *settings.UserIndex
 }
@@ -59,20 +58,21 @@ func NewServer(c *Config) (*Server, error) {
 		config:     c,
 		httpServer: cnet.NewHTTPServer(),
 		Logger:     cio.NewLogger("server"),
-		sessions:   settings.NewUsers(),
 	}
 	server.Info = true
 	server.users = settings.NewUserIndex(server.Logger)
-	if c.AuthFile != "" {
-		if err := server.users.LoadUsers(c.AuthFile); err != nil {
-			return nil, err
-		}
-	}
+	//pin the --auth user first so authfile reloads cannot drop it
 	if c.Auth != "" {
 		u := &settings.User{Addrs: []*regexp.Regexp{settings.UserAllowAll}}
 		u.Name, u.Pass = settings.ParseAuth(c.Auth)
-		if u.Name != "" {
-			server.users.AddUser(u)
+		if u.Name == "" {
+			return nil, server.Errorf("invalid auth string, expected <user>:<pass>")
+		}
+		server.users.PinUser(u)
+	}
+	if c.AuthFile != "" {
+		if err := server.users.LoadUsers(c.AuthFile); err != nil {
+			return nil, err
 		}
 	}
 
@@ -86,7 +86,7 @@ func NewServer(c *Config) (*Server, error) {
 		} else {
 			key, err = os.ReadFile(c.KeyFile)
 			if err != nil {
-				log.Fatalf("Failed to read key file %s", c.KeyFile)
+				return nil, server.Errorf("Failed to read key file %s: %s", c.KeyFile, err)
 			}
 		}
 
@@ -94,21 +94,21 @@ func NewServer(c *Config) (*Server, error) {
 		if ccrypto.IsChiselKey(key) {
 			pemBytes, err = ccrypto.ChiselKey2PEM(key)
 			if err != nil {
-				log.Fatalf("Invalid key %s", string(key))
+				return nil, server.Errorf("Invalid chisel key: %s", err)
 			}
 		}
 	} else {
 		//generate private key (optionally using seed)
 		pemBytes, err = ccrypto.Seed2PEM(c.KeySeed)
 		if err != nil {
-			log.Fatal("Failed to generate key")
+			return nil, server.Errorf("Failed to generate key: %s", err)
 		}
 	}
 
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
-		log.Fatal("Failed to parse key")
+		return nil, server.Errorf("Failed to parse key: %s", err)
 	}
 	//fingerprint this key
 	server.fingerprint = ccrypto.FingerprintKey(private.PublicKey())
@@ -204,14 +204,16 @@ func (s *Server) authUser(c ssh.ConnMetadata, password []byte) (*ssh.Permissions
 	// check the user exists and has matching password
 	n := c.User()
 	user, found := s.users.Get(n)
-	if !found || user.Pass != string(password) {
-		s.Debugf("Login failed for user: %s", n)
-		return nil, errors.New("Invalid authentication for username: %s")
+	if !found || subtle.ConstantTimeCompare([]byte(user.Pass), password) != 1 {
+		//info level: operators should see failed attempts (#521)
+		s.Infof("Login failed for user %q (%s)", n, c.RemoteAddr())
+		return nil, fmt.Errorf("invalid authentication for username: %s", n)
 	}
-	// insert the user session map
-	// TODO this should probably have a lock on it given the map isn't thread-safe
-	s.sessions.Set(string(c.SessionID()), user)
-	return nil, nil
+	// pass the username through to the handshake handler, which
+	// re-resolves the user (no session state to leak or race)
+	return &ssh.Permissions{
+		Extensions: map[string]string{"user": n},
+	}, nil
 }
 
 // AddUser adds a new user into the server user index

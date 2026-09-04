@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jpillora/chisel/share/settings"
 )
 
 type wsConn struct {
@@ -12,16 +13,37 @@ type wsConn struct {
 	buff []byte
 }
 
-//NewWebSocketConn converts a websocket.Conn into a net.Conn
+const (
+	// x/crypto/ssh rejects transport packets whose length field exceeds this,
+	// so a full wire packet tops out around 256 KiB plus the 4-byte length and
+	// a MAC. Doubling leaves the exact framing overhead unspecified rather than
+	// tracking a dependency's internals, while retaining a finite bound on
+	// messages received before SSH authentication.
+	sshMaxTransportPacket     = 256 * 1024
+	defaultWebSocketReadLimit = 2 * sshMaxTransportPacket
+)
+
+// NewWebSocketConn converts a websocket.Conn into a net.Conn
 func NewWebSocketConn(websocketConn *websocket.Conn) net.Conn {
+	websocketConn.SetReadLimit(configuredWebSocketReadLimit())
 	c := wsConn{
 		Conn: websocketConn,
 	}
 	return &c
 }
 
-//Read is not threadsafe though thats okay since there
-//should never be more than one reader
+func configuredWebSocketReadLimit() int64 {
+	// Only 0 disables the limit. Treat negative values as invalid rather than
+	// letting gorilla interpret them as another unlimited setting.
+	limit := settings.EnvInt("WS_READ_LIMIT", defaultWebSocketReadLimit)
+	if limit < 0 {
+		limit = defaultWebSocketReadLimit
+	}
+	return int64(limit)
+}
+
+// Read is not threadsafe though that's okay since there
+// should never be more than one reader
 func (c *wsConn) Read(dst []byte) (int, error) {
 	ldst := len(dst)
 	//use buffer or read new message
