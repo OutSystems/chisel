@@ -132,9 +132,9 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-		//reject forward remotes when disabled
-		if !r.Reverse && s.config.NoForward {
-			failed(s.Errorf("Forward remotes disabled on server"))
+		//confirm forward tunnels are allowed
+		if !r.Reverse && !s.config.Forward {
+			failed(s.Errorf("Forward port forwarding not enabled on server"))
 			return
 		}
 		//confirm reverse tunnels are allowed
@@ -164,7 +164,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 	tunnelConfig := tunnel.Config{
 		Logger:    l,
 		Inbound:   s.config.Reverse,
-		Outbound:  !s.config.NoForward,
+		Outbound:  s.config.Forward,
 		Socks:     s.config.Socks5,
 		KeepAlive: s.config.KeepAlive,
 	}

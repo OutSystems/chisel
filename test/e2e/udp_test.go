@@ -22,7 +22,7 @@ func TestUDP(t *testing.T) {
 	//chisel client+server
 	inboundPort := availableUDPPort()
 	teardown := simpleSetup(t,
-		&chserver.Config{},
+		&chserver.Config{Forward: true},
 		&chclient.Config{
 			Remotes: []string{
 				inboundPort + ":" + echoPort + "/udp",

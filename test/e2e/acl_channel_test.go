@@ -85,6 +85,7 @@ func TestAuthChannelDenied(t *testing.T) {
 	// Start chisel server with ACL: user can only reach allowedPort
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "acl-test",
+		Forward: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -146,6 +147,7 @@ func TestAuthChannelAllowed(t *testing.T) {
 	// Start chisel server with ACL: user can only reach allowedPort
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "acl-test-allowed",
+		Forward: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -218,6 +220,7 @@ func TestNoAuthChannel(t *testing.T) {
 	// Start chisel server with NO auth
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "no-acl-test",
+		Forward: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -284,6 +287,7 @@ func TestAuthWildcardChannel(t *testing.T) {
 
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "acl-wildcard-test",
+		Forward: true,
 		Auth:    "admin:secret",
 	})
 	if err != nil {
@@ -335,6 +339,7 @@ func TestAuthSocksChannelDenied(t *testing.T) {
 	// not from the "SOCKS5 is not enabled" guard.
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "acl-socks-denied",
+		Forward: true,
 		Socks5:  true,
 	})
 	if err != nil {
@@ -398,6 +403,7 @@ func TestAuthSocksChannelAllowed(t *testing.T) {
 
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "acl-socks-allowed",
+		Forward: true,
 		Socks5:  true,
 	})
 	if err != nil {

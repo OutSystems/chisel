@@ -16,7 +16,7 @@ func TestChiselKeyEnvironmentVariable(t *testing.T) {
 	tmpPort := availablePort()
 	
 	// Create server with empty config - should pick up CHISEL_KEY env var
-	serverConfig := &chserver.Config{}
+	serverConfig := &chserver.Config{Forward: true}
 	
 	// Setup server and client
 	teardown := simpleSetup(t,

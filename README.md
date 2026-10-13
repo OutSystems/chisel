@@ -184,8 +184,9 @@ $ chisel server --help
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
-    --disable-forward, Reject forward (non-reverse) remotes, including
-    forward SOCKS5, UDP and stdio remotes. Reverse remotes are not affected.
+    --allow-forward, Allow clients to specify forward (non-reverse)
+    remotes, including forward SOCKS5, UDP and stdio remotes. Off by
+    default. Reverse remotes are not affected.
 
     --tls-key, Enables TLS and provides optional path to a PEM-encoded
     TLS private key. When this flag is set, you must also set --tls-cert,
@@ -544,17 +545,18 @@ Since WebSockets support is required:
   - server no longer panics when a client disconnects between the SSH handshake and its config request (#608)
   - client exits non-zero when `--max-retry-count` is exhausted; new `--min-retry-interval` (default 1s); `socks5://` accepted for `--proxy`
   - `go install` builds report their real version; sessions and failed logins are logged at info level
-  - new `--disable-forward` server flag rejects forward (non-reverse) remotes; this flag is specific to this fork and is not in upstream
+  - **breaking**: forward (non-reverse) remotes are rejected unless the server runs with the new `--allow-forward` flag; this flag is specific to this fork and is not in upstream
   - releases now ship goreleaser-built multi-arch Docker images to GHCR and Docker Hub with correctly stamped versions; releasing is two-stage — tagging builds a draft GitHub release plus version-tagged images, and publishing the draft promotes the Docker `latest` / `X` / `X.Y` tags
 
 ### Upgrading to 1.12
 
-Four changes may require action when upgrading from 1.11.x or earlier:
+Five changes may require action when upgrading from 1.11.x or earlier:
 
 1. **SOCKS5 + `--authfile`** (enforced since v1.11.7): users who should keep proxy access need an authfile entry matching the token `socks` (the wildcard `""` keeps working). See [Authentication](#authentication). Denied requests are logged server-side as `Denied connection to socks (ACL)`.
 2. **`--fingerprint`**: truncated legacy MD5 fingerprints are rejected. Use the full SHA256 fingerprint printed by the server and client (the full 16-octet MD5 colon form is still accepted, but deprecated).
 3. **`--auth`** values must be `<user>:<pass>` — strings without a colon now fail at startup instead of silently disabling authentication.
 4. **Exit codes**: `chisel client` with `--max-retry-count` now exits non-zero when connection attempts are exhausted; scripts checking `$?` and systemd `Restart=on-failure` units will notice.
+5. **Forward remotes**: the server rejects forward (non-reverse) remotes, including forward SOCKS5, UDP and stdio, unless started with `--allow-forward`. Reverse remotes are unaffected. This flag is specific to this fork.
 
 ## License
 

@@ -41,7 +41,7 @@ func TestHalfCloseThroughTunnel(t *testing.T) {
 	//chisel client+server
 	tunnelPort := availablePort()
 	teardown := simpleSetup(t,
-		&chserver.Config{},
+		&chserver.Config{Forward: true},
 		&chclient.Config{
 			Remotes: []string{tunnelPort + ":127.0.0.1:" + targetPort},
 		},
@@ -75,7 +75,7 @@ func TestHalfCloseThroughTunnel(t *testing.T) {
 func TestDialFailureRejectsChannel(t *testing.T) {
 	//allocate a port and leave it closed
 	deadPort := availablePort()
-	s, err := chserver.NewServer(&chserver.Config{KeySeed: "dial-fail-test"})
+	s, err := chserver.NewServer(&chserver.Config{KeySeed: "dial-fail-test", Forward: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestDialFailureClosesLocalConn(t *testing.T) {
 	deadPort := availablePort()
 	tunnelPort := availablePort()
 	teardown := simpleSetup(t,
-		&chserver.Config{},
+		&chserver.Config{Forward: true},
 		&chclient.Config{
 			Remotes: []string{tunnelPort + ":127.0.0.1:" + deadPort},
 		},

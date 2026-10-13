@@ -44,6 +44,7 @@ func TestConnCloseBeforeConfig(t *testing.T) {
 
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "preconfig-test",
+		Forward: true,
 	})
 	if err != nil {
 		t.Fatal(err)

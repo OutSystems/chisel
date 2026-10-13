@@ -11,7 +11,7 @@ func TestBase(t *testing.T) {
 	tmpPort := availablePort()
 	//setup server, client, fileserver
 	teardown := simpleSetup(t,
-		&chserver.Config{},
+		&chserver.Config{Forward: true},
 		&chclient.Config{
 			Remotes: []string{tmpPort + ":$FILEPORT"},
 		})

@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const forwardDisabledMsg = "Forward remotes disabled on server"
+const forwardDisabledMsg = "Forward port forwarding not enabled on server"
 
 func startForwardTestServer(t *testing.T, config *chserver.Config) string {
 	t.Helper()
@@ -68,16 +68,16 @@ func forwardRemoteSpecs() []struct {
 	}
 }
 
-// TestDisableForwardRemoteValidation checks which remotes the server accepts
-// in the config request, with and without --disable-forward.
-func TestDisableForwardRemoteValidation(t *testing.T) {
-	for _, disableForward := range []bool{false, true} {
-		t.Run(fmt.Sprintf("disableForward=%v", disableForward), func(t *testing.T) {
+// TestAllowForwardRemoteValidation checks which remotes the server accepts
+// in the config request, with and without --allow-forward.
+func TestAllowForwardRemoteValidation(t *testing.T) {
+	for _, allowForward := range []bool{false, true} {
+		t.Run(fmt.Sprintf("allowForward=%v", allowForward), func(t *testing.T) {
 			addr := startForwardTestServer(t, &chserver.Config{
-				KeySeed:      fmt.Sprintf("disable-forward-%v", disableForward),
-				Reverse:      true,
-				Socks5:       true,
-				NoForward: disableForward,
+				KeySeed: fmt.Sprintf("allow-forward-%v", allowForward),
+				Reverse: true,
+				Socks5:  true,
+				Forward: allowForward,
 			})
 			for _, spec := range forwardRemoteSpecs() {
 				t.Run(spec.name, func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestDisableForwardRemoteValidation(t *testing.T) {
 					sc, _, _ := dialChiselSSH(t, addr, "", "")
 					defer sc.Close()
 					ok, reply := sendConfigResult(t, sc, []*settings.Remote{r})
-					wantOK := spec.reverse || !disableForward
+					wantOK := spec.reverse || allowForward
 					if ok != wantOK {
 						t.Fatalf("config accepted = %v, want %v (reply %q)", ok, wantOK, reply)
 					}
@@ -102,9 +102,9 @@ func TestDisableForwardRemoteValidation(t *testing.T) {
 }
 
 // TestForwardRemoteRejectedByClient runs a real client with a forward remote
-// against a server with --disable-forward.
+// against a server without --allow-forward.
 func TestForwardRemoteRejectedByClient(t *testing.T) {
-	addr := startForwardTestServer(t, &chserver.Config{KeySeed: "disable-forward-client", Reverse: true, NoForward: true})
+	addr := startForwardTestServer(t, &chserver.Config{KeySeed: "allow-forward-client", Reverse: true})
 	var logs syncBuffer
 	c, err := chclient.NewClient(&chclient.Config{
 		Server:        "http://" + addr,
@@ -129,9 +129,9 @@ func TestForwardRemoteRejectedByClient(t *testing.T) {
 	}
 }
 
-// TestOutboundChannelsRejectedWithDisableForward opens channels directly,
+// TestOutboundChannelsRejectedWithoutAllowForward opens channels directly,
 // skipping the config validation, to confirm the tunnel refuses them.
-func TestOutboundChannelsRejectedWithDisableForward(t *testing.T) {
+func TestOutboundChannelsRejectedWithoutAllowForward(t *testing.T) {
 	target, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -153,10 +153,9 @@ func TestOutboundChannelsRejectedWithDisableForward(t *testing.T) {
 	}()
 
 	addr := startForwardTestServer(t, &chserver.Config{
-		KeySeed:   "disable-forward-channel",
-		Reverse:   true,
-		Socks5:    true,
-		NoForward: true,
+		KeySeed: "allow-forward-channel",
+		Reverse: true,
+		Socks5:  true,
 	})
 	sc, _, _ := dialChiselSSH(t, addr, "", "")
 	defer sc.Close()
