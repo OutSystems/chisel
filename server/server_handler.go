@@ -132,11 +132,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-		//confirm forward tunnels are allowed
-		if !r.Reverse && !s.config.Forward {
-			failed(s.Errorf("Forward port forwarding not enabled on server"))
-			return
-		}
 		//confirm reverse tunnels are allowed
 		if r.Reverse && !s.config.Reverse {
 			l.Debugf("Denied reverse port forwarding request, please enable --reverse")
