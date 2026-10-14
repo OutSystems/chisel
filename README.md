@@ -184,6 +184,10 @@ $ chisel server --help
     --reverse, Allow clients to specify reverse port forwarding remotes
     in addition to normal remotes.
 
+    --disable-forward, Refuse connections through forward (non-reverse)
+    remotes, including forward SOCKS5, UDP and stdio remotes. Reverse
+    remotes are not affected.
+
     --tls-key, Enables TLS and provides optional path to a PEM-encoded
     TLS private key. When this flag is set, you must also set --tls-cert,
     and you cannot set --tls-domain.
@@ -541,6 +545,7 @@ Since WebSockets support is required:
   - server no longer panics when a client disconnects between the SSH handshake and its config request (#608)
   - client exits non-zero when `--max-retry-count` is exhausted; new `--min-retry-interval` (default 1s); `socks5://` accepted for `--proxy`
   - `go install` builds report their real version; sessions and failed logins are logged at info level
+  - new `--disable-forward` server flag refuses connections through forward (non-reverse) remotes; this flag is specific to this fork and is not in upstream
   - releases now ship goreleaser-built multi-arch Docker images to GHCR and Docker Hub with correctly stamped versions; releasing is two-stage — tagging builds a draft GitHub release plus version-tagged images, and publishing the draft promotes the Docker `latest` / `X` / `X.Y` tags
 
 ### Upgrading to 1.12
