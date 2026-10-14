@@ -60,10 +60,10 @@ func dialTestServer(t *testing.T, s *Server) ssh.Conn {
 	return sc
 }
 
-func TestOutboundChannelFollowsAllowForward(t *testing.T) {
-	for _, allowForward := range []bool{false, true} {
-		t.Run(fmt.Sprintf("allowForward=%v", allowForward), func(t *testing.T) {
-			s, err := NewServer(&Config{KeySeed: "unit", Reverse: true, Forward: allowForward})
+func TestOutboundChannelFollowsDisableForward(t *testing.T) {
+	for _, disableForward := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disableForward=%v", disableForward), func(t *testing.T) {
+			s, err := NewServer(&Config{KeySeed: "unit", Reverse: true, NoForward: disableForward})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -95,11 +95,11 @@ func TestOutboundChannelFollowsAllowForward(t *testing.T) {
 			if err == nil {
 				ch.Close()
 			}
-			if allowForward && err != nil {
-				t.Fatalf("channel rejected with --allow-forward: %v", err)
+			if !disableForward && err != nil {
+				t.Fatalf("channel rejected without --disable-forward: %v", err)
 			}
-			if !allowForward && (err == nil || !strings.Contains(err.Error(), "Denied outbound connection")) {
-				t.Fatalf("channel not denied without --allow-forward: %v", err)
+			if disableForward && (err == nil || !strings.Contains(err.Error(), "Denied outbound connection")) {
+				t.Fatalf("channel not denied with --disable-forward: %v", err)
 			}
 		})
 	}

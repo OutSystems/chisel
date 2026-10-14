@@ -16,7 +16,6 @@ func startSocksACLServer(t *testing.T, seed string, addrs ...string) string {
 	t.Helper()
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: seed,
-		Forward: true,
 		Socks5:  true,
 	})
 	if err != nil {

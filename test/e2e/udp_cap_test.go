@@ -37,7 +37,7 @@ func TestUDPConnCapRecovery(t *testing.T) {
 	//chisel client+server
 	inboundPort := availableUDPPort()
 	teardown := simpleSetup(t,
-		&chserver.Config{Forward: true},
+		&chserver.Config{},
 		&chclient.Config{
 			Remotes: []string{
 				inboundPort + ":" + echoPort + "/udp",

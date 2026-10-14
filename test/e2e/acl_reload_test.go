@@ -32,7 +32,7 @@ func TestACLAppliesAfterUserRemoval(t *testing.T) {
 			c.Close()
 		}
 	}()
-	s, err := chserver.NewServer(&chserver.Config{KeySeed: "acl-reload-test", Forward: true})
+	s, err := chserver.NewServer(&chserver.Config{KeySeed: "acl-reload-test"})
 	if err != nil {
 		t.Fatal(err)
 	}

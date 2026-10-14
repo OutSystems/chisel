@@ -115,7 +115,7 @@ func TestKeepAliveReconnect(t *testing.T) {
 	go f.Serve(fl)
 	defer f.Close()
 	//chisel server
-	server, err := chserver.NewServer(&chserver.Config{Forward: true})
+	server, err := chserver.NewServer(&chserver.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

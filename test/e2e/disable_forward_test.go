@@ -12,16 +12,16 @@ import (
 	"github.com/jpillora/chisel/share/settings"
 )
 
-// TestForwardRemotesNeedAllowForward runs a client with both a forward and a
-// reverse remote. Without --allow-forward the session stays up and the
+// TestForwardRemotesWithDisableForward runs a client with both a forward and a
+// reverse remote. With --disable-forward the session stays up and the
 // reverse remote works, but forward connections are refused.
-func TestForwardRemotesNeedAllowForward(t *testing.T) {
-	for _, allowForward := range []bool{false, true} {
-		t.Run(fmt.Sprintf("allowForward=%v", allowForward), func(t *testing.T) {
+func TestForwardRemotesWithDisableForward(t *testing.T) {
+	for _, disableForward := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disableForward=%v", disableForward), func(t *testing.T) {
 			fwdPort := availablePort()
 			revPort := availablePort()
 			teardown := simpleSetup(t,
-				&chserver.Config{Reverse: true, Forward: allowForward},
+				&chserver.Config{Reverse: true, NoForward: disableForward},
 				&chclient.Config{
 					Remotes: []string{fwdPort + ":$FILEPORT", "R:" + revPort + ":$FILEPORT"},
 				})
@@ -30,19 +30,19 @@ func TestForwardRemotesNeedAllowForward(t *testing.T) {
 				t.Fatalf("reverse remote: got %q, %v", result, err)
 			}
 			result, err := post("http://localhost:"+fwdPort, "foo")
-			if allowForward && (err != nil || result != "foo!") {
+			if !disableForward && (err != nil || result != "foo!") {
 				t.Fatalf("forward remote: got %q, %v", result, err)
 			}
-			if !allowForward && err == nil {
+			if disableForward && err == nil {
 				t.Fatalf("forward remote was not refused: got %q", result)
 			}
 		})
 	}
 }
 
-// TestOutboundChannelsRejectedWithoutAllowForward opens channels directly
-// to confirm the server never dials a target without --allow-forward.
-func TestOutboundChannelsRejectedWithoutAllowForward(t *testing.T) {
+// TestOutboundChannelsRejectedWithDisableForward opens channels directly
+// to confirm the server never dials a target with --disable-forward.
+func TestOutboundChannelsRejectedWithDisableForward(t *testing.T) {
 	target, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -64,9 +64,10 @@ func TestOutboundChannelsRejectedWithoutAllowForward(t *testing.T) {
 	}()
 
 	s, err := chserver.NewServer(&chserver.Config{
-		KeySeed: "allow-forward-channel",
-		Reverse: true,
-		Socks5:  true,
+		KeySeed:   "disable-forward-channel",
+		Reverse:   true,
+		Socks5:    true,
+		NoForward: true,
 	})
 	if err != nil {
 		t.Fatal(err)

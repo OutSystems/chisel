@@ -46,7 +46,6 @@ func TestSocksEndToEnd(t *testing.T) {
 	// chisel server: SOCKS5 enabled, user granted ONLY socks
 	s, err := chserver.NewServer(&chserver.Config{
 		KeySeed: "socks-e2e",
-		Forward: true,
 		Socks5:  true,
 	})
 	if err != nil {

@@ -19,7 +19,6 @@ func TestAuth(t *testing.T) {
 	teardown := simpleSetup(t,
 		&chserver.Config{
 			KeySeed: "foobar",
-			Forward: true,
 			//note: this was the path "../bench/userfile", which
 			//silently disabled auth entirely (no colon in the
 			//string); invalid auth strings are now a fatal error
