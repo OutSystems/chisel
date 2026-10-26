@@ -34,7 +34,8 @@ func (t *Tunnel) handleSSHChannels(ctx context.Context, chans <-chan ssh.NewChan
 
 func (t *Tunnel) handleSSHChannel(ctx context.Context, ch ssh.NewChannel) {
 	if !t.Config.Outbound {
-		t.Debugf("Denied outbound connection")
+		//info-level so refusals are visible without -v; the target is client-controlled, so quote it
+		t.Infof("Denied outbound connection to %q", string(ch.ExtraData()))
 		ch.Reject(ssh.Prohibited, "Denied outbound connection")
 		return
 	}

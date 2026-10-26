@@ -546,6 +546,7 @@ Since WebSockets support is required:
   - client exits non-zero when `--max-retry-count` is exhausted; new `--min-retry-interval` (default 1s); `socks5://` accepted for `--proxy`
   - `go install` builds report their real version; sessions and failed logins are logged at info level
   - new `--disable-forward` server flag refuses connections through forward (non-reverse) remotes; this flag is specific to this fork and is not in upstream
+  - refused outbound connections are logged at info level with the requested target (`Denied outbound connection to "<host:port>"`)
   - releases now ship goreleaser-built multi-arch Docker images to GHCR and Docker Hub with correctly stamped versions; releasing is two-stage — tagging builds a draft GitHub release plus version-tagged images, and publishing the draft promotes the Docker `latest` / `X` / `X.Y` tags
 
 ### Upgrading to 1.12
