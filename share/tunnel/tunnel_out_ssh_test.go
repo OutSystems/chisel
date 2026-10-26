@@ -2,7 +2,6 @@ package tunnel
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/jpillora/chisel/share/cio"
@@ -43,8 +42,5 @@ func TestDeniedOutboundConnectionLoggedAtInfo(t *testing.T) {
 	const want = "server: Denied outbound connection to \"example.com:80\\nserver: forged\"\n"
 	if got := logs.String(); got != want {
 		t.Fatalf("unexpected log:\n got: %q\nwant: %q", got, want)
-	}
-	if strings.Count(logs.String(), "\n") != 1 {
-		t.Fatalf("client-controlled target created extra log lines: %q", logs.String())
 	}
 }
