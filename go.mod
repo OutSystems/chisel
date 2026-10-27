@@ -1,6 +1,6 @@
 module github.com/jpillora/chisel
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
@@ -10,9 +10,9 @@ require (
 	github.com/jpillora/opts v1.8.1
 	github.com/jpillora/requestlog v1.0.0
 	github.com/jpillora/sizestr v1.0.0
-	golang.org/x/crypto v0.57.0
+	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.60.0
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
@@ -22,8 +22,8 @@ require (
 	github.com/jpillora/ansi v1.0.3 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )
 
 replace github.com/jpillora/chisel => ../chisel
